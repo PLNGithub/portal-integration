@@ -1,0 +1,206 @@
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="./style.css">
+    <link rel="stylesheet"
+        href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <title>Portal Integration</title>
+</head>
+
+<body>
+    <h1>Portal Integration</h1>
+    <p>Documentation on how to integrate an application to Zerone Portal</p>
+    <div class="main">
+        <h3>Overview</h3>
+        <p>Zerone Portal is an application that act as a portal for other applications registered to it. As such, a user
+            can only log in into their applications through portal. If a user logged out from an application, they still
+            can access portal and their other applications. But, if user logged out from portal, they will be logged out
+            from all of their applications.</p>
+        <p>Auth service used in portal (and other applications) is Supabase Auth. The process of signing a user to an
+            application will be done by an admin who have the privilege to do so.</p>
+
+        <h3>Integration:</h3>
+        <h4>1. Remove Application Login Route</h4>
+        <p>With the current implementation, user can only access application through portal. So, if you already built
+            a login route, you can remove it.</p>
+
+        <h4>2. Add Route /portal-login/:jwt To Application</h4>
+        <p>Of course you can change the :jwt with whatever you like. We will use it to extract the parameter send by
+            portal. Make sure this route is public, not inside the application private route.</p>
+        <pre>
+            <code class="language-javascript">//App.tsx
+
+    import {Routes, Route} from "react-router-dom";
+    import {PortalLogin} from "../path/to/portal-login.tsx"
+
+    < Routes>
+        < MyPrivateRoute>
+            //...private routes
+        < /MyPrivateRoute>
+
+         //...public routes       
+        < Route path="/portal-login/:jwt" element={< PortalLogin/>} />
+    < Routes/>
+            </code>
+            
+        </pre>
+
+        <h4>2. Create portal-login.tsx file</h4>
+        <p>Again, you can name the file whatever you like, tsx or jsx doesn't matter.
+            This page will contains nothing but a loading indicator. You
+            can use a spinner indicator, or just a loading text like example below.</p>
+        <pre>
+            <code>//portal-login.tsx
+
+import { useEffect } from "react";
+import { useParams, useNavigate } from "react-router-dom";
+
+//your supabase client
+import { supabaseClient } from "../../utility";
+
+function Portal() {
+    //this is the params we use earlier
+  const { jwt } = useParams();
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    const fetch = async () => {
+      //split the url params send by portal  
+      //the params contains access_token and refresh_token
+      const token: any = jwe?.split("portal-divider");
+
+      //set the session, log the user in
+      const { error } = await supabaseClient.auth.setSession({
+        access_token: token && token[0],
+        refresh_token: token && token[1],
+      });
+
+      //you can just look browser's network tab and delete this if statement
+      if(error) console.log(error)
+
+      //ask for refresh session, this is to ensure that sessions we got from portal is valid
+      const { error: errorRefresh } = await supabaseClient.auth.refreshSession();
+
+      //navigate to main page or your default authenticated page
+      //at this point, user is already signed in 
+      if (!error && !errorRefresh) {
+        navigate("/");
+      }
+    };
+
+    fetch();
+
+  }, []);
+  return (
+    &lt;p&gt;Loading...&lt;/p&gt;
+  );
+}
+
+export default Portal;
+            </code>
+        </pre>
+
+        <h4>3. Authenticate on Every Route</h4>
+        <p>Unlike most single-page-app auth implementation. Here, in our portal implementation, we need to check session
+            validity in every private route. Don't worry, we don't have to put a function in every route. We only need
+            one, and put it in a component which got rendered if route is changing. This component usually is a
+            navigation component, like sidebar.</p>
+
+        <pre>
+                <code>//Sidebar.tsx
+import { NavLink } from "react-router-dom";
+import { supabaseClient } from "../../utility";
+
+//example of putting the session check in a navigation component
+function Sidebar(){
+
+    const outCheck = async () => {
+        //check user session from supabase db
+        const { data } = await supabaseClient.auth.getUser();
+        const { user } = data;
+
+        //we remove our local session if no user found
+        //this means, portal is logged out
+        if (!user) {
+          /**
+          this local storage key-value is set by supabase client
+          when we do setSession and refreshSession earlier  
+          */ 
+          localStorage.removeItem("sb-be-auth-token");
+
+          //this is portal url, we'll discuss this later
+          window.location.href = import.meta.env.VITE_PORTAL_URL;
+        }
+      };
+    //call the function
+    outCheck();
+
+    return (
+        &lt;div&gt;
+            &lt;NavLink&gt;Dashboard&lt;/NavLink&gt;
+            &lt;NavLink&gt;User&lt;/NavLink&gt;
+            &lt;NavLink&gt;Setting&lt;/NavLink&gt;
+            &lt;button&gt;Logout&lt;/button&gt;
+
+        &lt;/div&gt;
+    )
+}
+
+export default Sidebar;
+                </code>
+            </pre>
+        <p>Our session checker now will get called in every route change. And if portal is logged out, then we clear our
+            local session, and send user to portal page. Don't worry, the
+            function job is just to make an async call to supabase db, it doesn't deal with any state so it won't affect
+            performance. If you want to put it inside a useEffect, feel free to do so, just make sure the function get
+            called on every route change.</p>
+
+        <h4>4. Adjust SignOut</h4>
+        <p>By default, supabase client has a signOut method for signing out a user. But in our implementation, we won't
+            use it. Using that method will terminate the session from supabase db. What we want to achieve is that
+            application can't terminate session, only portal can. So, if you are using signOut method, you can change it
+            to removing the local session only, like below.</p>
+        <pre>
+                <code>
+    function Sidebar(){
+
+        const handleSignOut = ()=> {
+           localStorage.removeItem("sb-be-auth-token");
+           window.location.href = import.meta.env.VITE_PORTAL_URL;
+        }
+
+        return(
+           // ...rest of the code
+
+            &lt;button onClick={handleSignOut}&gt;Logout&lt;/button&gt;
+
+           // ...rest of the code
+        )
+    }
+                </code>
+            </pre>
+
+        <h4>5. .env File</h4>
+        <p>Add portal url in the .env file. If you use framework other than vite, you can modify according to what you
+            use. The URL probably will be changed later when portal deployed to production.</p>
+        <pre>
+            <code>
+
+VITE_PORTAL_URL=https://portal-c3e94.web.app/
+            </code>
+        </pre>
+    </div>
+
+    <script>hljs.highlightAll();</script>
+</body>
+
+
+</html>
