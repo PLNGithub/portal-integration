@@ -39,7 +39,7 @@
             <code class="language-javascript">//App.tsx
 
     import {Routes, Route} from "react-router-dom";
-    import {PortalLogin} from "../path/to/portal-login.tsx"
+    import {Portal} from "../path/to/portal-login.tsx"
 
     < Routes>
         < MyPrivateRoute>
@@ -47,7 +47,7 @@
         < /MyPrivateRoute>
 
          //...public routes       
-        < Route path="/portal-login/:jwt" element={< PortalLogin/>} />
+        < Route path="/portal-login/:jwt" element={< Portal/>} />
     < Routes/>
             </code>
             
