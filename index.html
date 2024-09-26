@@ -41,7 +41,7 @@
     import {Routes, Route} from "react-router-dom";
     import {Portal} from "../path/to/portal-login.tsx"
 
-    < Routes>
+    &lt;Routes>
         < MyPrivateRoute>
             //...private routes
         < /MyPrivateRoute>
@@ -197,6 +197,54 @@ export default Sidebar;
 VITE_PORTAL_URL=https://portal-c3e94.web.app/
             </code>
         </pre>
+
+        <h4>6. Finally, Close The Window If There's Already Application Tab</h4>
+        <p>If an application is already in user's browser tab, according to current implementation, we want to close the
+            window when the user visit
+            /portal-login again (when user click an application from portal again).</p>
+        <p>We can achieve this behavior by leveraging the <a
+                href="https://developer.mozilla.org/en-US/docs/Web/API/Broadcast_Channel_API"
+                target="_blank">BroadcastChannel API</a>. Here's how we are going to implement it in our application. We
+            will need to create the channel in our root index file.
+        </p>
+
+        <pre>
+            <code>//index.tsx
+
+    import React from "react";
+    import { createRoot } from "react-dom/client";
+    import App from "./App";
+
+    //========our broadcast channel=====================//            
+    const bc = new BroadcastChannel("portal");
+    bc.onmessage = (event) => {
+    if (event.data === "init") {
+        bc.postMessage("window-opened");
+    }
+    if (event.data === "window-opened") {
+        if (window.location.href.match("portal-login")) {
+            window.close();
+        }
+    }
+    };
+    bc.postMessage("init");
+    //========our broadcast channel=====================//            
+
+
+    const container = document.getElementById("root") as HTMLElement;
+    const root = createRoot(container);
+
+    //our root app render
+    root.render(
+    < React.StrictMode>
+        < React.Suspense fallback="loading">
+            < App />
+        < /React.Suspense>
+    &lt;/React.StrictMode>
+    );
+            </code>
+        </pre>
+
     </div>
 
     <script>hljs.highlightAll();</script>
