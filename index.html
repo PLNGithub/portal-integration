@@ -134,7 +134,7 @@ function Sidebar(){
           this local storage key-value is set by supabase client
           when we do setSession and refreshSession earlier  
           */ 
-          localStorage.removeItem("sb-be-auth-token");
+          localStorage.clear();
 
           //this is portal url, we'll discuss this later
           window.location.href = import.meta.env.VITE_PORTAL_URL;
@@ -173,7 +173,7 @@ export default Sidebar;
     function Sidebar(){
 
         const handleSignOut = ()=> {
-           localStorage.removeItem("sb-be-auth-token");
+           localStorage.clear();
            window.location.href = import.meta.env.VITE_PORTAL_URL;
         }
 
